@@ -132,7 +132,15 @@ def _read_pdf(path: Path) -> tuple[list[Block], int, bool]:
                 max_size = max(s["size"] for s in spans)
                 bold = all("bold" in s["font"].lower() or s["flags"] & 16 for s in spans)
                 short = len(text.split()) <= 14
-                if short and (max_size >= body * 1.18 or (bold and max_size >= body)):
+                mono = all(s["flags"] & 8 or any(k in s["font"].lower() for k in ("cour", "mono", "consol")) for s in spans)
+                if mono:
+                    code = "\n".join("".join(s["text"] for s in l["spans"]) for l in lines)
+                    prev = blocks[-1] if blocks else None
+                    if prev and prev.kind == "code" and prev.page == pno:
+                        prev.text += "\n" + code  # consecutive code lines form one block
+                    else:
+                        blocks.append(Block(pno, "code", code))
+                elif short and (max_size >= body * 1.18 or (bold and max_size >= body)):
                     level = 1 if max_size >= body * 1.5 else 2 if max_size >= body * 1.18 else 3
                     blocks.append(Block(pno, "heading", text, level))
                 else:
