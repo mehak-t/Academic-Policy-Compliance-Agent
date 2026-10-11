@@ -152,6 +152,9 @@ def t_save_checklist(ws: Workspace, requirements: list, rubric: dict | None = No
             "keywords": [str(k) for k in kws][:10],
             "source": str(r.get("source", "")),
         })
+    if len(clean) < 10:
+        raise ToolError(f"Only {len(clean)} requirements - split compound items so each one is a single checkable "
+                        "requirement (aim for 10-20, e.g. goal, role, tools, memory and planning are separate items). Nothing was saved.")
     rubric = {str(k): float(v) for k, v in (rubric or {}).items() if _is_num(v)}
     unknown_cats = sorted({r["rubric_category"] for r in clean} - set(rubric)) if rubric else []
     if unknown_cats:
