@@ -64,7 +64,7 @@ class LLMClient:
                     json_mode = False  # JSON mode rejected or gave an empty reply -> plain text + our parser
                     continue
                 busy = any(k in msg for k in ("503", "high demand", "unavailable", "timed out", "no longer available", "connection",
-                                            "quota", "resource_exhausted"))
+                                            "quota", "resource_exhausted", "empty message"))
                 if busy and self.backups:
                     self.model = self.backups.pop(0)  # overloaded or daily quota used up -> switch to a backup model
                     continue
