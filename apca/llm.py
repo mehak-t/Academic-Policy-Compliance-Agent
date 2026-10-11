@@ -37,7 +37,7 @@ class LLMClient:
     def chat(self, messages: list[dict], max_retries: int = 5, json_mode: bool = True) -> str:
         delay = 4.0
         last_err = None
-        for attempt in range(max_retries):
+        for attempt in range(max_retries + len(self.backups)):
             try:
                 kwargs = dict(model=self.model, messages=messages, temperature=self.settings.temperature, max_tokens=4096)
                 if json_mode:
@@ -59,11 +59,12 @@ class LLMClient:
                 if json_mode and ("response_format" in msg or ("json" in msg and "support" in msg)):
                     json_mode = False  # some models reject JSON mode -> plain text + our parser
                     continue
-                busy = any(k in msg for k in ("503", "high demand", "unavailable", "timed out", "no longer available"))
+                busy = any(k in msg for k in ("503", "high demand", "unavailable", "timed out", "no longer available",
+                                            "quota", "resource_exhausted"))
                 if busy and self.backups:
-                    self.model = self.backups.pop(0)  # main model overloaded -> switch to a backup model
+                    self.model = self.backups.pop(0)  # overloaded or daily quota used up -> switch to a backup model
                     continue
-                retriable = any(k in msg for k in ("429", "rate", "timeout", "temporarily", "overloaded", "502", "503", "empty"))
+                retriable = any(k in msg for k in ("429", "rate", "timeout", "connection", "temporarily", "overloaded", "502", "503", "empty"))
                 if not retriable or attempt == max_retries - 1:
                     break
                 time.sleep(delay)

@@ -24,9 +24,10 @@ DEFAULT_MODELS = {
     "ollama": "qwen2.5:7b",
 }
 
-# Tried in order when the main model is overloaded or not available.
+# Tried in order when the main model is overloaded or its free daily quota is used up
+# (free-tier quotas are counted per model).
 BACKUP_MODELS = {
-    "gemini": ["gemini-3.5-flash", "gemini-3.5-flash-lite"],
+    "gemini": ["gemini-3.5-flash", "gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"],
     "openrouter": ["google/gemma-3-27b-it:free"],
 }
 
