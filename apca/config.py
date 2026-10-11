@@ -19,9 +19,15 @@ PROVIDERS = {
 
 DEFAULT_MODELS = {
     "openrouter": "meta-llama/llama-3.3-70b-instruct:free",
-    "gemini": "gemini-2.5-flash",
+    "gemini": "gemini-3.6-flash",
     "groq": "llama-3.3-70b-versatile",
     "ollama": "qwen2.5:7b",
+}
+
+# Tried in order when the main model is overloaded or not available.
+BACKUP_MODELS = {
+    "gemini": ["gemini-3.5-flash", "gemini-3.5-flash-lite"],
+    "openrouter": ["google/gemma-3-27b-it:free"],
 }
 
 

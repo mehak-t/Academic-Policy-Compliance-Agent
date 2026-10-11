@@ -68,7 +68,7 @@ Create a `.env` file in the project folder (it is git-ignored):
 ```
 LLM_PROVIDER=gemini
 LLM_API_KEY=your-key-here
-# optional: LLM_MODEL=gemini-2.5-flash
+# optional: LLM_MODEL=gemini-3.6-flash
 ```
 
 Any OpenAI-compatible endpoint works. Set `LLM_PROVIDER` to one of:
@@ -76,7 +76,7 @@ Any OpenAI-compatible endpoint works. Set `LLM_PROVIDER` to one of:
 | Provider | Key from | Default model |
 |---|---|---|
 | `openrouter` | openrouter.ai (free models) | `meta-llama/llama-3.3-70b-instruct:free` |
-| `gemini` | aistudio.google.com | `gemini-2.5-flash` |
+| `gemini` | aistudio.google.com | `gemini-3.6-flash` |
 | `groq` | console.groq.com | `llama-3.3-70b-versatile` |
 | `ollama` | local, no key | `qwen2.5:7b` |
 
