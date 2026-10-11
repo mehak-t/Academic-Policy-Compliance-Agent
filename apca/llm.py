@@ -1,0 +1,87 @@
+"""Thin wrapper around any OpenAI-compatible chat endpoint (OpenRouter, Gemini,
+Groq, Ollama...). Adds retries for free-tier rate limits and token accounting."""
+
+from __future__ import annotations
+
+import time
+
+from .config import Settings
+
+
+class LLMError(RuntimeError):
+    pass
+
+
+class LLMClient:
+    def __init__(self, settings: Settings):
+        from openai import OpenAI
+
+        if not settings.api_key:
+            raise LLMError("No LLM_API_KEY set. Copy .env.example to .env and add your key.")
+        self.settings = settings
+        self.model = settings.model
+        headers = {}
+        if settings.provider == "openrouter":
+            # optional attribution headers recommended by OpenRouter
+            headers = {"HTTP-Referer": "https://github.com/mehak-t/Academic-Policy-Compliance-Agent",
+                       "X-Title": "Academic Policy Compliance Agent"}
+        self.client = OpenAI(base_url=settings.base_url, api_key=settings.api_key, default_headers=headers, timeout=120)
+        self.calls = 0
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+
+    def chat(self, messages: list[dict], max_retries: int = 5, json_mode: bool = True) -> str:
+        delay = 4.0
+        last_err = None
+        for attempt in range(max_retries):
+            try:
+                kwargs = dict(model=self.model, messages=messages, temperature=self.settings.temperature, max_tokens=4096)
+                if json_mode:
+                    kwargs["response_format"] = {"type": "json_object"}
+                resp = self.client.chat.completions.create(**kwargs)
+                self.calls += 1
+                if resp.usage:
+                    self.prompt_tokens += resp.usage.prompt_tokens or 0
+                    self.completion_tokens += resp.usage.completion_tokens or 0
+                if not resp.choices:
+                    raise LLMError(f"Empty response: {getattr(resp, 'error', resp)}")
+                text = resp.choices[0].message.content or ""
+                if not text.strip():
+                    raise LLMError("Model returned an empty message")
+                return text
+            except Exception as e:  # noqa: BLE001 - provider SDK errors vary a lot
+                last_err = e
+                msg = str(e).lower()
+                if json_mode and ("response_format" in msg or ("json" in msg and "support" in msg)):
+                    json_mode = False  # some models reject JSON mode -> plain text + our parser
+                    continue
+                retriable = any(k in msg for k in ("429", "rate", "timeout", "temporarily", "overloaded", "502", "503", "empty"))
+                if not retriable or attempt == max_retries - 1:
+                    break
+                time.sleep(delay)
+                delay *= 2
+        raise LLMError(f"LLM call failed after retries: {last_err}")
+
+    def usage(self) -> dict:
+        return {"model": self.model, "provider": self.settings.provider, "llm_calls": self.calls,
+                "prompt_tokens": self.prompt_tokens, "completion_tokens": self.completion_tokens}
+
+
+class ScriptedLLM:
+    """Replays canned responses - used by the unit tests so they run offline."""
+
+    def __init__(self, responses: list[str], model: str = "scripted"):
+        self.responses = list(responses)
+        self.model = model
+        self.calls = 0
+        self.seen: list[list[dict]] = []
+
+    def chat(self, messages, **_):
+        self.seen.append(messages)
+        self.calls += 1
+        if not self.responses:
+            return '{"thought": "nothing left", "final_answer": "done"}'
+        return self.responses.pop(0)
+
+    def usage(self):
+        return {"model": self.model, "provider": "scripted", "llm_calls": self.calls, "prompt_tokens": 0, "completion_tokens": 0}
