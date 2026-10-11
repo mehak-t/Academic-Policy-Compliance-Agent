@@ -5,6 +5,8 @@ __pycache__/
 venv/
 .pytest_cache/
 .streamlit/secrets.toml
+.vscode/
+.idea/
 
 # runtime output
 logs/*
