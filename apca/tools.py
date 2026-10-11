@@ -153,8 +153,12 @@ def t_save_checklist(ws: Workspace, requirements: list, rubric: dict | None = No
             "source": str(r.get("source", "")),
         })
     rubric = {str(k): float(v) for k, v in (rubric or {}).items() if _is_num(v)}
-    ws.checklist, ws.rubric, ws.format_rules = clean, rubric, format_rules or {}
     unknown_cats = sorted({r["rubric_category"] for r in clean} - set(rubric)) if rubric else []
+    if unknown_cats:
+        # marks can only be estimated if every item maps onto a real rubric component
+        raise ToolError(f"rubric_category values {unknown_cats} are not rubric components. "
+                        f"Use exactly one of {list(rubric)} for every item (keep Part A/B/C in 'category'). Nothing was saved.")
+    ws.checklist, ws.rubric, ws.format_rules = clean, rubric, format_rules or {}
     pol = ws.doc("policy")
     ws.memory.save_policy(pol.sha1, Path(pol.path).name, clean, rubric, ws.format_rules)
     return {
@@ -162,7 +166,7 @@ def t_save_checklist(ws: Workspace, requirements: list, rubric: dict | None = No
         "ids": [r["id"] for r in clean],
         "rubric": rubric,
         "format_rules": ws.format_rules,
-        "warnings": problems + ([f"rubric_category not in rubric: {unknown_cats}"] if unknown_cats else []),
+        "warnings": problems,
         "stored_in_policy_memory": True,
     }
 
