@@ -40,7 +40,10 @@ class LLMClient:
         last_err = None
         for attempt in range(max_retries + len(self.backups)):
             try:
-                kwargs = dict(model=self.model, messages=messages, temperature=self.settings.temperature, max_tokens=4096)
+                # thinking models spend part of max_tokens on reasoning, so leave plenty of room
+                kwargs = dict(model=self.model, messages=messages, temperature=self.settings.temperature, max_tokens=16000)
+                if self.settings.provider == "gemini":
+                    kwargs["reasoning_effort"] = "low"
                 if json_mode:
                     kwargs["response_format"] = {"type": "json_object"}
                 resp = self.client.chat.completions.create(**kwargs)
