@@ -258,6 +258,8 @@ def t_record_assessments(ws: Workspace, assessments: list) -> dict:
         if status in ("Satisfied", "Partially Satisfied") and not ws.assessments[rid]["evidence"]:
             errors.append(f"{rid}: status {status} needs an evidence quote")
         saved.append(rid)
+    if saved:
+        ws.score = None  # verdicts changed -> score must be recalculated
     remaining = [r["id"] for r in ws.checklist if r["id"] not in ws.assessments]
     return {"recorded": saved, "errors": errors, "remaining_unassessed": remaining}
 
