@@ -61,7 +61,14 @@ tests/                unit + offline end-to-end tests
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env      # then put your API key in .env
+```
+
+Create a `.env` file in the project folder (it is git-ignored):
+
+```
+LLM_PROVIDER=gemini
+LLM_API_KEY=your-key-here
+# optional: LLM_MODEL=gemini-2.5-flash
 ```
 
 Any OpenAI-compatible endpoint works. Set `LLM_PROVIDER` to one of:

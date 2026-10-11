@@ -9,7 +9,6 @@ venv/
 .idea/
 
 # runtime output
-logs/*
-!logs/.gitkeep
+logs/
 memory/
 outputs/
