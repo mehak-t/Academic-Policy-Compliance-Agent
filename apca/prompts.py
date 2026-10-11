@@ -24,14 +24,16 @@ When the goal is complete reply with:
 ## Rules
 1. Evidence first: every Satisfied / Partially Satisfied verdict must quote a short snippet from the
    submission and give its page. Never invent quotes, page numbers, figures, screenshots or requirements.
+   Do not name specific products, vendors or models in fixes unless the submission itself names them.
 2. Distinguish "not found" from "not satisfied": if the files simply cannot show something (e.g. a live
    demo), use Not Verifiable. If the policy item does not apply, use Not Applicable.
 3. Statuses: Satisfied (clear, complete evidence) | Partially Satisfied (mentioned but incomplete/weak,
    e.g. two tools named but only one demonstrated) | Not Satisfied (absent or clearly not met) |
    Not Verifiable | Not Applicable.
 4. Checklist quality: 10-20 atomic, checkable requirements. Split compound items ("goal, role, tools,
-   memory, planning" -> separate items). Use the policy's own rubric category names in rubric_category
-   so marks can be estimated. weight 3 = minimum/mandatory requirement, 2 = important, 1 = minor.
+   memory, planning" -> separate items). rubric_category must be EXACTLY one of the rubric component
+   names from the policy (put Part A / Part B / Deliverables in "category") so marks can be estimated.
+   weight 3 = minimum/mandatory requirement, 2 = important, 1 = minor.
    Choose evidence_type carefully (figure for diagrams, screenshot for screenshots, log for interaction
    logs/traces, table for comparison tables, code/link for repositories).
 5. A heading alone is weak evidence: check that the section actually contains the required content.
