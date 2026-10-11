@@ -9,6 +9,7 @@ import argparse
 import sys
 
 from .config import load_settings
+from .llm import LLMError
 from .pipeline import approve_and_export, run_audit
 
 
@@ -34,7 +35,11 @@ def main(argv=None):
 
     settings = load_settings(provider=args.provider, model=args.model, max_steps=args.max_steps)
     print(f"Model: {settings.model} via {settings.provider}\n")
-    result, tracer = run_audit(args.policy, args.submission, settings, goal=args.goal)
+    try:
+        result, tracer = run_audit(args.policy, args.submission, settings, goal=args.goal)
+    except LLMError as e:
+        print(f"LLM error: {e}\nCheck LLM_PROVIDER / LLM_API_KEY in your .env file.")
+        return 2
 
     sc = result.get("score") or {}
     print("\n" + "=" * 70)
