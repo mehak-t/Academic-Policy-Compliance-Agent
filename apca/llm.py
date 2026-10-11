@@ -55,13 +55,13 @@ class LLMClient:
                     raise LLMError(f"Empty response: {getattr(resp, 'error', resp)}")
                 text = resp.choices[0].message.content or ""
                 if not text.strip():
-                    raise LLMError("Model returned an empty message")
+                    raise LLMError(f"Model {self.model} returned an empty message (finish_reason={resp.choices[0].finish_reason})")
                 return text
             except Exception as e:  # noqa: BLE001 - provider SDK errors vary a lot
                 last_err = e
                 msg = str(e).lower()
-                if json_mode and ("response_format" in msg or ("json" in msg and "support" in msg)):
-                    json_mode = False  # some models reject JSON mode -> plain text + our parser
+                if json_mode and ("response_format" in msg or ("json" in msg and "support" in msg) or "empty message" in msg):
+                    json_mode = False  # JSON mode rejected or gave an empty reply -> plain text + our parser
                     continue
                 busy = any(k in msg for k in ("503", "high demand", "unavailable", "timed out", "no longer available", "connection",
                                             "quota", "resource_exhausted"))
