@@ -219,42 +219,78 @@ def write_docx(content, path: Path):
 
 
 def write_pdf(content, path: Path):
-    import html
-
+    """Simple top-to-bottom layout with PyMuPDF (text, tables drawn as grids, images)."""
     import pymupdf
 
-    parts = []
+    doc = pymupdf.open()
+    W, H, M = 595, 842, 56
+    state = {"page": None, "y": H}
+
+    def new_page():
+        state["page"] = doc.new_page(width=W, height=H)
+        state["y"] = M
+
+    def ensure(h):
+        if state["page"] is None or state["y"] + h > H - M:
+            new_page()
+
+    def text(t, size=11, font="helv", gap=6, indent=0):
+        width = W - 2 * M - indent
+        words, lines, cur = t.split(" "), [], ""
+        for w in words:
+            trial = (cur + " " + w).strip()
+            if pymupdf.get_text_length(trial, fontname=font, fontsize=size) > width and cur:
+                lines.append(cur)
+                cur = w
+            else:
+                cur = trial
+        lines.append(cur)
+        for line in lines:
+            ensure(size * 1.4)
+            state["page"].insert_text((M + indent, state["y"] + size), line, fontname=font, fontsize=size)
+            state["y"] += size * 1.4
+        state["y"] += gap
+
     for kind, val in content:
         if kind == "title":
-            parts.append(f"<h1 style='text-align:center'>{html.escape(val)}</h1>")
+            ensure(60)
+            text(val, size=20, font="hebo", gap=10)
         elif kind == "h1":
-            parts.append(f"<h2>{html.escape(val)}</h2>")
+            ensure(60)
+            text(val, size=14, font="hebo", gap=4)
         elif kind == "h2":
-            parts.append(f"<h3>{html.escape(val)}</h3>")
-        elif kind in ("p", "caption"):
-            style = " style='font-style:italic'" if kind == "caption" else ""
-            parts.append(f"<p{style}>{html.escape(val)}</p>")
+            ensure(50)
+            text(val, size=12, font="hebo", gap=3)
+        elif kind == "p":
+            text(val)
+        elif kind == "caption":
+            text(val, size=9, font="heit")
         elif kind == "code":
-            parts.append("<pre style='font-size:8pt'>" + html.escape(val) + "</pre>")
+            for line in val.splitlines():
+                text(line, size=8, font="cour", gap=0)
+            state["y"] += 6
         elif kind == "img":
-            parts.append(f"<img src='{val}' width='420'/>")
+            pix = pymupdf.Pixmap(str(IMG / val))
+            w = W - 2 * M
+            h = w * pix.height / pix.width
+            ensure(h + 4)
+            state["page"].insert_image(pymupdf.Rect(M, state["y"], M + w, state["y"] + h), filename=str(IMG / val))
+            state["y"] += h + 4
         elif kind == "table":
-            rows = "".join("<tr>" + "".join(f"<td style='border:1px solid #444;padding:3px'>{html.escape(c)}</td>" for c in r) + "</tr>" for r in val)
-            parts.append(f"<table style='border-collapse:collapse'>{rows}</table>")
+            col_w = (W - 2 * M) / len(val[0])
+            row_h = 18
+            ensure(row_h * len(val) + 6)
+            pg = state["page"]
+            for r, row in enumerate(val):
+                for c, cell in enumerate(row):
+                    rect = pymupdf.Rect(M + c * col_w, state["y"], M + (c + 1) * col_w, state["y"] + row_h)
+                    pg.draw_rect(rect, color=(0.2, 0.2, 0.2), width=0.6)
+                    pg.insert_text((rect.x0 + 4, rect.y0 + 12), cell, fontname="hebo" if r == 0 else "helv", fontsize=9)
+                state["y"] += row_h
+            state["y"] += 8
         elif kind == "break":
-            parts.append("<p style='page-break-after:always'></p>")
-    story = pymupdf.Story("<body style='font-family:sans-serif;font-size:11pt'>" + "".join(parts) + "</body>",
-                          archive=pymupdf.Archive(str(IMG)))
-    writer = pymupdf.DocumentWriter(str(path))
-    mediabox = pymupdf.paper_rect("a4")
-    where = mediabox + (54, 54, -54, -54)
-    more = True
-    while more:
-        dev = writer.begin_page(mediabox)
-        more, _ = story.place(where)
-        story.draw(dev)
-        writer.end_page()
-    writer.close()
+            new_page()
+    doc.save(path, garbage=4, deflate=True)
 
 
 def main():
