@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import time
 
-from .config import Settings
+from .config import BACKUP_MODELS, Settings
 
 
 class LLMError(RuntimeError):
@@ -17,15 +17,19 @@ class LLMClient:
         from openai import OpenAI
 
         if not settings.api_key:
-            raise LLMError("No LLM_API_KEY set. Copy .env.example to .env and add your key.")
+            raise LLMError("No LLM_API_KEY set. Add it to the .env file (see README).")
         self.settings = settings
         self.model = settings.model
+        self.backups = [m for m in BACKUP_MODELS.get(settings.provider, []) if m != settings.model]
         headers = {}
         if settings.provider == "openrouter":
             # optional attribution headers recommended by OpenRouter
             headers = {"HTTP-Referer": "https://github.com/mehak-t/Academic-Policy-Compliance-Agent",
                        "X-Title": "Academic Policy Compliance Agent"}
-        self.client = OpenAI(base_url=settings.base_url, api_key=settings.api_key, default_headers=headers, timeout=120)
+        elif settings.provider == "gemini":
+            # newer Gemini keys are only accepted through Google's own header
+            headers = {"x-goog-api-key": settings.api_key}
+        self.client = OpenAI(base_url=settings.base_url, api_key=settings.api_key, default_headers=headers, timeout=90)
         self.calls = 0
         self.prompt_tokens = 0
         self.completion_tokens = 0
@@ -54,6 +58,10 @@ class LLMClient:
                 msg = str(e).lower()
                 if json_mode and ("response_format" in msg or ("json" in msg and "support" in msg)):
                     json_mode = False  # some models reject JSON mode -> plain text + our parser
+                    continue
+                busy = any(k in msg for k in ("503", "high demand", "unavailable", "timed out", "no longer available"))
+                if busy and self.backups:
+                    self.model = self.backups.pop(0)  # main model overloaded -> switch to a backup model
                     continue
                 retriable = any(k in msg for k in ("429", "rate", "timeout", "temporarily", "overloaded", "502", "503", "empty"))
                 if not retriable or attempt == max_retries - 1:
