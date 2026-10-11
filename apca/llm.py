@@ -29,7 +29,8 @@ class LLMClient:
         elif settings.provider == "gemini":
             # newer Gemini keys are only accepted through Google's own header
             headers = {"x-goog-api-key": settings.api_key}
-        self.client = OpenAI(base_url=settings.base_url, api_key=settings.api_key, default_headers=headers, timeout=90)
+        self.client = OpenAI(base_url=settings.base_url, api_key=settings.api_key, default_headers=headers, timeout=90,
+                             max_retries=0)  # retries + model fallback are handled below
         self.calls = 0
         self.prompt_tokens = 0
         self.completion_tokens = 0
@@ -59,7 +60,7 @@ class LLMClient:
                 if json_mode and ("response_format" in msg or ("json" in msg and "support" in msg)):
                     json_mode = False  # some models reject JSON mode -> plain text + our parser
                     continue
-                busy = any(k in msg for k in ("503", "high demand", "unavailable", "timed out", "no longer available",
+                busy = any(k in msg for k in ("503", "high demand", "unavailable", "timed out", "no longer available", "connection",
                                             "quota", "resource_exhausted"))
                 if busy and self.backups:
                     self.model = self.backups.pop(0)  # overloaded or daily quota used up -> switch to a backup model
