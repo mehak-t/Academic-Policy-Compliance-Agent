@@ -157,26 +157,28 @@ def _read_docx(path: Path) -> tuple[list[Block], int, bool]:
 
     d = docx.Document(str(path))
     blocks: list[Block] = []
-    page, explicit_breaks = 1, 0
-    words_on_page = 0
+    body = d.element.body
+    # Pages rendered by Word are reliable; files never opened in Word only have
+    # manual page breaks, so we also estimate overflow from the amount of content.
+    rendered = body.find(".//" + qn("w:lastRenderedPageBreak")) is not None
+    page, words_on_page = 1, 0
+    mono = {"consolas", "courier new", "courier", "lucida console", "source code pro", "cascadia code"}
 
     def bump(words: int):
         nonlocal page, words_on_page
         words_on_page += words
-        if explicit_breaks == 0 and words_on_page > WORDS_PER_PAGE:
+        if not rendered and words_on_page > WORDS_PER_PAGE:
             page += 1
             words_on_page = 0
 
-    body = d.element.body
     for el in body.iterchildren():
         tag = el.tag.split("}")[-1]
         if tag == "p":
-            # page breaks written by Word or inserted manually
-            breaks = len(el.findall(".//" + qn("w:lastRenderedPageBreak"))) + sum(
-                1 for br in el.findall(".//" + qn("w:br")) if br.get(qn("w:type")) == "page"
-            )
+            if rendered:
+                breaks = len(el.findall(".//" + qn("w:lastRenderedPageBreak")))
+            else:
+                breaks = sum(1 for br in el.findall(".//" + qn("w:br")) if br.get(qn("w:type")) == "page")
             if breaks:
-                explicit_breaks += breaks
                 page += breaks
                 words_on_page = 0
             para = docx.text.paragraph.Paragraph(el, d)
@@ -190,13 +192,17 @@ def _read_docx(path: Path) -> tuple[list[Block], int, bool]:
             style = (para.style.name or "").lower() if para.style is not None else ""
             runs = [r for r in para.runs if r.text.strip()]
             all_bold = bool(runs) and all(r.bold for r in runs)
+            is_code = "code" in style or "source" in style or (bool(runs) and all((r.font.name or "").lower() in mono for r in runs))
             if style.startswith("heading") or style == "title":
                 m = re.search(r"(\d)", style)
                 blocks.append(Block(page, "heading", text, int(m.group(1)) if m else 1))
+            elif is_code:
+                if blocks and blocks[-1].kind == "code" and blocks[-1].page == page:
+                    blocks[-1].text += "\n" + para.text  # merge consecutive code lines
+                else:
+                    blocks.append(Block(page, "code", para.text))
             elif all_bold and len(text.split()) <= 12:
                 blocks.append(Block(page, "heading", text, 3))
-            elif "code" in style or "source" in style:
-                blocks.append(Block(page, "code", para.text))
             else:
                 blocks.append(Block(page, _kind_for_text(text), text))
             bump(len(text.split()))
@@ -214,12 +220,7 @@ def _read_docx(path: Path) -> tuple[list[Block], int, bool]:
             blocks.append(Block(page, "table", text[:2000]))
             bump(len(text.split()))
 
-    # Word only stores the page breaks it rendered last time the file was saved.
-    # When those are clearly too few for the amount of text, fall back to estimating.
-    words = sum(150 if b.kind == "image" else len(b.text.split()) for b in blocks)
-    if explicit_breaks and page < words / (WORDS_PER_PAGE * 1.6):
-        return blocks, _paginate(blocks), True
-    return blocks, max(page, 1), explicit_breaks == 0
+    return blocks, max(page, 1), not rendered
 
 
 def _read_markdown(text: str) -> list[Block]:
