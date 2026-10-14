@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import streamlit as st
@@ -47,6 +48,20 @@ with st.sidebar:
     max_steps = st.slider("Max agent steps", 8, 30, 20)
     st.caption("The key is used only for this session and is never written to disk.")
     st.divider()
+    saved = sorted((ROOT / "outputs").glob("audit_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if saved:
+        st.header("Saved audits")
+        pick = st.selectbox("Open an approved audit", ["-"] + [p.name for p in saved])
+        if pick != "-" and st.button("Open"):
+            data = json.loads((ROOT / "outputs" / pick).read_text(encoding="utf-8"))
+            log = Path(data.get("logs", {}).get("jsonl", ""))
+            events = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines()] if log.exists() else []
+            st.session_state["result"] = data
+            st.session_state["tracer"] = SimpleNamespace(events=events, md_path=data["logs"]["markdown"])
+            st.session_state["exported"] = {k: str(ROOT / "outputs" / pick.replace(".json", ext))
+                                            for k, ext in (("docx", ".docx"), ("markdown", ".md"), ("csv", ".csv"), ("json", ".json"))}
+            st.session_state["loaded"] = data.get("approved_by")
+        st.divider()
     st.markdown("**How it works**\n\n1. Agent plans the audit\n2. Extracts a checklist from the policy\n"
                 "3. Searches the submission for evidence\n4. Runs format + consistency tools\n"
                 "5. Scores and prioritises fixes\n6. **You** review and approve")
@@ -86,6 +101,7 @@ run = st.button("▶ Run audit", type="primary", disabled=not (policy_path and s
 if run:
     settings = load_settings(provider=provider, model=model, api_key=api_key or None, max_steps=max_steps)
     st.session_state.pop("exported", None)
+    st.session_state.pop("loaded", None)
     box = st.status("Agent working…", expanded=True)
 
     def show(ev):
@@ -147,8 +163,10 @@ if res:
         if overrides:
             st.warning(f"{len(overrides)} verdict(s) changed by you: {overrides}")
         a1, a2 = st.columns([2, 1])
+        if st.session_state.get("loaded"):
+            st.info(f"Saved audit - already approved by {st.session_state['loaded']}.")
         reviewer = a1.text_input("Reviewer name", value="student")
-        if a2.button("✅ Approve & export report", type="primary"):
+        if not st.session_state.get("loaded") and a2.button("✅ Approve & export report", type="primary"):
             paths = approve_and_export(res, st.session_state["settings"], reviewer, overrides, st.session_state["tracer"])
             st.session_state["exported"] = paths
             st.success("Audit approved, saved to audit memory and exported.")
@@ -202,6 +220,8 @@ if res:
         st.caption("Same submission, checked by a classical keyword rule-based agent (no LLM, no memory, single pass).")
         sub_file = res["submission"].get("file")
         sub_path = submission_path if submission_path and Path(submission_path).name == sub_file else None
+        if not sub_path and (SAMPLES / "submissions" / str(sub_file)).exists():
+            sub_path = str(SAMPLES / "submissions" / sub_file)
         if sub_path:
             c = classical_check(sub_path)
             col1, col2 = st.columns(2)
