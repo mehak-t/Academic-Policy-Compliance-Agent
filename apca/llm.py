@@ -37,7 +37,7 @@ class LLMClient:
         self.prompt_tokens = 0
         self.completion_tokens = 0
 
-    def chat(self, messages: list[dict], max_retries: int = 3, json_mode: bool = True) -> str:
+    def chat(self, messages: list[dict], max_retries: int = 6, json_mode: bool = True) -> str:
         """Try the main model first on every call; on a busy / empty reply fall through to the
         backup models for this call only. A model whose daily quota is used up is skipped for the rest of the run."""
         last_err = None
@@ -58,7 +58,7 @@ class LLMClient:
                         if "quota" in msg or "resource_exhausted" in msg or "no longer available" in msg:
                             self.exhausted.add(model)
                         break
-            time.sleep(4 * (attempt + 1))  # every model busy -> wait and go round again
+            time.sleep(min(10 * (attempt + 1), 30))  # every model busy -> wait and go round again
         raise LLMError(f"LLM call failed after retries: {last_err}")
 
     def _call(self, model: str, messages: list[dict], json_mode: bool) -> str:
