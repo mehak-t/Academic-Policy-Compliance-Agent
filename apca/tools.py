@@ -337,7 +337,7 @@ TOOLS: dict[str, Tool] = {
         Tool("check_format", "Run deterministic format checks on the submission (uses the saved format_rules if rules omitted).",
              {"rules": "optional format_rules object"}, t_check_format),
         Tool("check_consistency", "Detect contradictions: claimed tools not shown in logs, dangling figure references, placeholders, empty sections.",
-             {"claimed_tools": "list of tool names the report says it uses (optional)"}, t_check_consistency),
+             {"claimed_tools": "tool names the SUBMISSION says its own project uses (e.g. web_search) - not the audit tools you are calling"}, t_check_consistency),
         Tool("record_assessments", "Record your verdict for one or more requirements.",
              {"assessments": "list of {id, status(Satisfied|Partially Satisfied|Not Satisfied|Not Verifiable|Not Applicable), evidence(short quote from submission), page, confidence(0-1), reason, suggested_fix}"},
              t_record_assessments),
