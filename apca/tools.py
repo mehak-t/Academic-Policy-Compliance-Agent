@@ -89,7 +89,10 @@ def t_read_document(ws: Workspace, role: str) -> dict:
     out = d.summary()
     out["role"] = role
     if role == "policy":
-        out["hint"] = "Call get_document_text('policy') to read the full instructions before building the checklist."
+        if ws.memory.get_policy(d.sha1) and not ws.checklist:
+            out["policy_memory"] = "A checklist for this exact policy file is already stored - call recall_policy_memory instead of re-extracting it."
+        else:
+            out["hint"] = "Call get_document_text('policy') to read the full instructions before building the checklist."
     return out
 
 

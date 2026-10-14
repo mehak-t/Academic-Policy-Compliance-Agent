@@ -182,6 +182,9 @@ class ComplianceAgent:
     def _result(self, ws: Workspace, final_answer: str, steps: int) -> dict:
         if ws.checklist and ws.assessments and ws.score is None:
             ws.score = calculate_compliance_score(ws.checklist, ws.assessments, ws.rubric or None)
+        if ws.comparison is not None and ws.assessments:
+            # the agent may have compared before its last verdicts - recompute from the final ones
+            execute(ws, "compare_with_previous_audit", {})
         for a in ws.assessments.values():
             a["status"] = normalize_status(a["status"])
         sub = ws.docs.get("submission")
