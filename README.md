@@ -27,6 +27,7 @@ before anything is saved or exported.
   and audit memory (compare v1 vs v2 of a report).
 - **Guardrails** – the agent cannot finish until every requirement has a verdict and the checks have run.
 - **Human-in-the-loop** – review/override verdicts, then approve to export DOCX / Markdown / CSV / JSON.
+- **Saved audits** – reopen any approved audit (with its trace) from the sidebar without calling the LLM.
 - **Observable** – live trace in the UI, plus `logs/<run>.jsonl` and `logs/<run>.md` for every run.
 - **Classical baseline** – a rule-based keyword checker for the Part C comparison.
 
@@ -111,17 +112,45 @@ pytest -q
 
 ## Example trace
 
+Real run on `samples/submissions/travel_agent_report_v1.docx` (shortened):
+
 ```
-step  1 [Plan] ["Check policy memory", "Extract checklist", "Read submission", ...]
-step  1 [Tool Call] recall_policy_memory({"role": "policy"})
-step  1 [Observation] {"found": false, ...}
-step  4 [Tool Call] save_checklist({"requirements": [...16 items...], "rubric": {...}})
+[Goal] Audit the submission against the policy. Extract every requirement and rubric component, identify missi
+step  1 [Plan] 1. Read the policy document (IA2_instructions.md) to extract requirements, rubric, and formatti
+step  1 [Thought] I need to start by reading the policy document to understand the requirements and rubric for
+step  1 [Tool Call] read_document({"role": "policy"})
+step  1 [Observation] IA2_instructions.md: 1 pages, 11 headings, 0 images
+step  2 [Tool Call] get_document_text({"role": "policy"})
+step  2 [Observation] read 2820 chars of policy
+step  3 [Tool Call] read_document({"role": "submission"})
+step  3 [Observation] travel_agent_report_v1.docx: 2 pages, 12 headings, 0 images
+step  4 [Tool Call] save_checklist({"requirements": [{"id": "REQ-01", "description": "Part A: E...)
+step  4 [Memory] save_checklist: hit
+step  4 [Observation] saved 14 requirements
+step  5 [Tool Call] get_document_text({"role": "submission"})
+step  5 [Observation] read 1397 chars of submission
 step  6 [Tool Call] find_evidence({"requirement_ids": "all"})
-step  7 [Thought] R07 claims three tools but the log only shows web_search -> Partially Satisfied
-step 10 [Tool Call] check_consistency({"claimed_tools": ["web_search", "calculator", "weather_api"]})
-step 10 [Observation] claim_contradiction: Report claims "three tools" but logs only show 1 tool
-step 12 [Final Answer] Compliance 41%. 5 high-priority fixes ...
+step  6 [Observation] evidence for 14 requirements
+step  7 [Tool Call] check_format({})
+step  7 [Observation] 8/14 format checks passed
+step  8 [Thought] Now I will run the consistency check.
+step  8 [Tool Call] check_consistency({"claimed_tools": ["web_search", "calculator", "weather_api"...)
+step  8 [Observation] 7 findings: Report claims "three tools" but logs/code only show calls to 1 tool(s): ['we
+step  9 [Thought] Now I will record assessments for all 14 requirements.
+step  9 [Tool Call] record_assessments({"assessments": [{"id": "REQ-01", "status": "Satisfied", "ev...)
+step  9 [Observation] recorded 14, remaining 0
+step 10 [Thought] Now I will calculate the compliance score.
+step 10 [Tool Call] calculate_compliance_score({})
+step 10 [Observation] score 43.6%, counts {'Satisfied': 3, 'Partially Satisfied': 6, 'Not Satisfied': 5}
+step 11 [Tool Call] compare_with_previous_audit({})
+step 11 [Memory] compare_with_previous_audit: miss
+step 11 [Observation] No earlier approved audit of this submission in memory.
+step 12 [Error] Unparseable reply (Invalid control character at: line 1 column 150 (char 149)): {"thought": "I
+step 13 [Final Answer] Executive Summary & Audit Report: Compliance Score: 43.6% (Estimated Rubric: 7.1 / 20 M
 ```
+
+The revised report (v2) was then audited: the checklist was recalled from policy memory and the
+version comparison showed 43.6% -> 92.3%, 9 requirements fixed and 2 still partially satisfied.
 
 ## Team
 
