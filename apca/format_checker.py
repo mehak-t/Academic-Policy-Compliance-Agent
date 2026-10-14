@@ -2,18 +2,26 @@
 
 from __future__ import annotations
 
+import re
+
 from .documents import Document
 from .search import tokenize
 
 
+def _words(text: str) -> list[str]:
+    # keep single letters so "Part B" does not match "Part A"
+    singles = [w for w in re.split(r"[^a-z0-9]+", text.lower()) if len(w) == 1]
+    return tokenize(text) + singles
+
+
 def match_section(name: str, doc: Document) -> dict | None:
     """Fuzzy-match a required section name against the document headings."""
-    want = set(tokenize(name))
+    want = set(_words(name))
     if not want:
         return None
     best, best_score = None, 0.0
     for h in doc.headings:
-        have = set(tokenize(h.text))
+        have = set(_words(h.text))
         if not have:
             continue
         overlap = len(want & have) / len(want)
